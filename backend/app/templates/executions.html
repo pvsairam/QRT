@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Execution History - FusionTest Platform{% endblock %}
+
+{% block content %}
+<div class="header-action">
+    <h2>Execution History</h2>
+</div>
+
+<div class="card" style="margin-top: 1rem;">
+    <p class="text-muted">Review past execution runs, view reports, and analyze test outcomes.</p>
+    
+    <table class="data-table" style="margin-top: 1rem;">
+        <thead>
+            <tr>
+                <th>Run ID</th>
+                <th>Script</th>
+                <th>Environment</th>
+                <th>Status</th>
+                <th>Started At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for run in executions %}
+            <tr>
+                <td>#{{ run.id }}</td>
+                <td><a href="/ui/scripts/{{ run.script_id }}">{{ run.script.name }}</a></td>
+                <td>{{ run.environment.name if run.environment else 'Unknown' }}</td>
+                <td>
+                    {% if run.status == 'Passed' %}
+                    <span class="badge" style="background: #e6f4ea; color: #1e8e3e; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Passed</span>
+                    {% elif run.status == 'Failed' %}
+                    <span class="badge" style="background: #fce8e6; color: #d93025; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Failed</span>
+                    {% else %}
+                    <span class="badge" style="background: #fef7e0; color: #b06000; padding: 2px 8px; border-radius: 12px; font-size: 12px;">{{ run.status }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ run.started_at.strftime('%Y-%m-%d %H:%M:%S') if run.started_at else '' }}</td>
+                <td>
+                    <a href="/ui/executions/{{ run.id }}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">View Report</a>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not executions %}
+            <tr>
+                <td colspan="6" style="text-align: center; color: #5f6368;">No executions recorded yet.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

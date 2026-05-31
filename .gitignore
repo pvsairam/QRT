@@ -1,0 +1,15 @@
+venv/
+__pycache__/
+*.pyc
+*.db
+*.xlsx
+data/
+scratch.py
+*.md
+test_*.py
+test.py
+query_*.py
+update_*.py
+verify_*.py
+add_col.py
+sanitize_db.py

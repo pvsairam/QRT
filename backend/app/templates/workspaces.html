@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Environments | FusionTest{% endblock %}
+{% block content %}
+<div style="margin-bottom: 2.5rem; display: flex; justify-content: space-between; align-items: flex-end;">
+    <div>
+        <h1>Environments</h1>
+        <p class="page-desc">Manage your environments and their instances.</p>
+    </div>
+    <button class="btn" onclick="document.getElementById('addForm').style.display='block'">+ New Environment</button>
+</div>
+
+<div id="addForm" class="card" style="display: none; margin-bottom: 2rem;">
+    <form method="POST" action="/ui/workspaces">
+        <div class="form-group">
+            <label>Environment Name</label>
+            <input type="text" name="name" required>
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <input type="text" name="description">
+        </div>
+        <button type="submit" class="btn">Create</button>
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('addForm').style.display='none'">Cancel</button>
+    </form>
+</div>
+
+<div class="grid-3">
+    {% for ws in workspaces %}
+    <div class="card">
+        <div id="ws-view-{{ ws.id }}">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <h3 style="font-weight: 600; font-size: 1.15rem; margin-bottom: 0.5rem; color: var(--text-primary);">{{ ws.name }}</h3>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="document.getElementById('ws-edit-{{ ws.id }}').style.display='block'; document.getElementById('ws-view-{{ ws.id }}').style.display='none';">Edit</button>
+                    <form method="POST" action="/ui/workspaces/{{ ws.id }}/delete" onsubmit="return confirm('Delete this environment and all its data?');">
+                        <button type="submit" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; color: var(--error-text);">Delete</button>
+                    </form>
+                </div>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem;">{{ ws.description or "No description." }}</p>
+        </div>
+        
+        <div id="ws-edit-{{ ws.id }}" style="display: none; margin-bottom: 1.25rem;">
+            <form method="POST" action="/ui/workspaces/{{ ws.id }}/edit">
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                    <label>Environment Name</label>
+                    <input type="text" name="name" value="{{ ws.name }}" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                    <label>Description</label>
+                    <input type="text" name="description" value="{{ ws.description or '' }}">
+                </div>
+                <button type="submit" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Save</button>
+                <button type="button" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="document.getElementById('ws-edit-{{ ws.id }}').style.display='none'; document.getElementById('ws-view-{{ ws.id }}').style.display='block';">Cancel</button>
+            </form>
+        </div>
+
+        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            <strong>Instances:</strong> {{ ws.environments|length }}
+        </div>
+        
+        <ul style="list-style-type: none; margin-bottom: 1rem; font-size: 0.85rem;">
+            {% for env in ws.environments %}
+            <li style="margin-bottom: 0.5rem; background: var(--bg-base); padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border-subtle);">
+                <div id="env-view-{{ env.id }}" style="display: flex; justify-content: space-between;">
+                    <div>
+                        <strong>{{ env.name }}</strong>
+                        {% if env.release_version %} <span style="color: var(--text-muted); font-size: 0.8rem;">({{ env.release_version }})</span>{% endif %}<br>
+                        <span style="color: var(--text-muted);">{{ env.base_url }}</span><br>
+                        {% if env.default_username %}<span style="font-size: 0.8rem; color: var(--text-secondary);">User: {{ env.default_username }}</span>{% endif %}
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                        <button type="button" style="background: none; border: none; color: var(--text-primary); cursor: pointer; font-size: 0.8rem;" onclick="document.getElementById('env-edit-{{ env.id }}').style.display='block'; document.getElementById('env-view-{{ env.id }}').style.display='none';">Edit</button>
+                        <form method="POST" action="/ui/workspaces/{{ ws.id }}/environments/{{ env.id }}/delete" onsubmit="return confirm('Delete this instance?');">
+                            <button type="submit" style="background: none; border: none; color: var(--error-text); cursor: pointer; font-size: 0.8rem;">Remove</button>
+                        </form>
+                    </div>
+                </div>
+                
+                <div id="env-edit-{{ env.id }}" style="display: none; padding-top: 0.5rem;">
+                    <form method="POST" action="/ui/workspaces/{{ ws.id }}/environments/{{ env.id }}/edit">
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="text" name="name" value="{{ env.name }}" required style="width: 40%; font-size: 0.8rem; padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                                <input type="text" name="base_url" value="{{ env.base_url }}" required style="width: 60%; font-size: 0.8rem; padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="text" name="default_username" value="{{ env.default_username or '' }}" placeholder="Username" style="width: 33%; font-size: 0.8rem; padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                                <input type="password" name="default_password" placeholder="New Password (optional)" style="width: 33%; font-size: 0.8rem; padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                                <input type="text" name="release_version" value="{{ env.release_version or '' }}" placeholder="Release" style="width: 34%; font-size: 0.8rem; padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+                            <button type="submit" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Save</button>
+                            <button type="button" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="document.getElementById('env-edit-{{ env.id }}').style.display='none'; document.getElementById('env-view-{{ env.id }}').style.display='block';">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        
+        <form method="POST" action="/ui/workspaces/{{ ws.id }}/environments" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" name="name" placeholder="Instance Name (e.g. UAT)" required style="width: 40%; font-size: 0.8rem; padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                    <input type="text" name="base_url" placeholder="URL (e.g. https://fa-xxxx.oraclecloud.com)" required style="width: 60%; font-size: 0.8rem; padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" name="default_username" placeholder="Username (optional)" style="width: 33%; font-size: 0.8rem; padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                    <input type="password" name="default_password" placeholder="Password (optional)" style="width: 33%; font-size: 0.8rem; padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                    <input type="text" name="release_version" placeholder="Release (e.g. 24A)" style="width: 34%; font-size: 0.8rem; padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                </div>
+            </div>
+            <button type="submit" class="btn" style="width: 100%; margin-top: 0.5rem; padding: 0.4rem; font-size: 0.8rem;">+ Add Instance</button>
+        </form>
+    </div>
+    {% else %}
+    <div style="grid-column: span 3; color: var(--text-muted);">No environments found.</div>
+    {% endfor %}
+</div>
+{% endblock %}

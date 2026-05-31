@@ -1,0 +1,646 @@
+{% extends "base.html" %}
+{% block title %}Script Editor | FusionTest{% endblock %}
+{% block content %}
+<style>
+.tab-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    outline: none;
+}
+.tab-btn.active {
+    color: var(--accent-orange);
+    border-bottom-color: var(--accent-orange);
+}
+.tab-btn:hover:not(.active) {
+    color: var(--text-primary);
+}
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease-in-out;
+}
+.tab-content.active {
+    display: block;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.action-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 1.5rem;
+    flex: 1;
+    min-width: 300px;
+}
+.action-card-title {
+    margin-top: 0;
+    font-size: 1.05rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+</style>
+
+<div style="margin-bottom: 2rem;">
+    <a href="/ui/scripts" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem; display: inline-flex; align-items: center; gap: 4px;">&larr; Back to Scripts</a>
+    <h1 style="margin-bottom: 0.5rem;">{{ script.name }}</h1>
+    <p class="page-desc" style="max-width: 800px; margin-bottom: 1.5rem;">
+        {{ script.description }} | <strong>Category:</strong> {{ script.category }}<br><br>
+        <strong>About this page:</strong> The Script Editor allows you to manage automated tests. You can either use <em>Record Actions</em> to automatically capture your browser interactions into steps, or you can add steps manually. Once recorded, you can hit <em>Run</em> to execute the script in a selected environment with a specific data profile to generate a test report.
+    </p>
+</div>
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const errorMsg = urlParams.get('error');
+    const successMsg = urlParams.get('success');
+    if (errorMsg) {
+        document.write(`<div style="background: #fce8e6; color: #d93025; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border: 1px solid #fad2cf; font-weight: 500;">❌ Error: ${errorMsg}</div>`);
+    } else if (successMsg) {
+        document.write(`<div style="background: #e6f4ea; color: #1e8e3e; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border: 1px solid #ceead6; font-weight: 500;">✨ Success: Action completed successfully.</div>`);
+    }
+</script>
+
+<div style="display: flex; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 2.5rem;">
+    <!-- Run Section -->
+    <div class="action-card">
+        <h3 class="action-card-title">Execute</h3>
+        <form id="runForm" onsubmit="executeScript(event)" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+            <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 150px;">
+                <label>Environment</label>
+                <select id="envSelect" required>
+                    {% for env in environments %}
+                    <option value="{{ env.id }}" data-url="{{ env.base_url }}">{{ env.name }} (Workspace {{ env.workspace_id }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 150px;">
+                <label>Data Profile</label>
+                <select id="profileSelect">
+                    <option value="">None (Use recorded values)</option>
+                    {% for dp in data_profiles %}
+                    <option value="{{ dp.id }}">{{ dp.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 150px;">
+                <label>Execution Mode</label>
+                <select id="runModeSelect">
+                    <option value="structured">Structured Steps</option>
+                    <option value="raw">Raw Python Code</option>
+                </select>
+            </div>
+            
+            <!-- Advanced Execution Options -->
+            <div style="flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-top: 0.5rem; padding: 1rem; background: var(--bg-panel-hover); border-radius: 6px; border: 1px solid var(--border-subtle);">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; margin: 0;">
+                    <input type="checkbox" id="execHeadless" value="true">
+                    Headless Mode
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; margin: 0;">
+                    <input type="checkbox" id="execVideo" value="true">
+                    Record Video
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; margin: 0;">
+                    <input type="checkbox" id="execTrace" value="true">
+                    Collect Trace
+                </label>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-left: auto;">
+                    <label style="margin: 0;">Screenshots:</label>
+                    <select id="execScreenshots" style="padding: 0.3rem; margin: 0;">
+                        <option value="on_failure">On Failure</option>
+                        <option value="always">Every Step</option>
+                        <option value="none">None</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button type="submit" id="runBtn" class="btn" style="width: 100%;">Run Execution</button>
+        </form>
+        <div id="runResult" style="margin-top: 10px; font-size: 0.85rem; font-weight: 500;"></div>
+        
+        <!-- Live Console -->
+        <div class="result-console" id="liveConsole" style="display: none; margin-top: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-size: 1rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Terminal Output</h3>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <button id="stopBtn" style="display: none; background: #ef4444; color: white; border: none; padding: 0.25rem 0.75rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">STOP EXECUTION</button>
+                    <span id="liveStatusBadge" style="padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.8rem; font-weight: bold; background: #525252;">PENDING</span>
+                </div>
+            </div>
+            
+            <div id="liveSteps" style="font-family: monospace; font-size: 0.9rem; color: #a1a1aa; line-height: 1.6; max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem;"></div>
+            
+            <div id="liveReportLink" style="margin-top: 1.5rem; display: none;">
+                <a href="#" target="_blank" class="btn" style="background-color: var(--success);">View Detailed Report</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Record Section -->
+    <div class="action-card" style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <div>
+            <h3 class="action-card-title">Record Actions</h3>
+            <form method="POST" action="/ui/scripts/{{ script.id }}/record" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+                <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 150px;">
+                    <label>Base URL Environment</label>
+                    <select name="environment_id" required onchange="document.getElementById('record-env-id').value = this.value">
+                        {% for env in environments %}
+                        <option value="{{ env.id }}">{{ env.name }} (Workspace {{ env.workspace_id }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <input type="hidden" name="environment_id" id="record-env-id" value="{{ environments[0].id if environments else '' }}">
+                <button type="submit" class="btn btn-secondary">Start Recording</button>
+                <button type="button" class="btn btn-secondary" onclick="window.location.reload();">↻</button>
+            </form>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.75rem; margin-bottom: 0;">
+                Perform actions, close browser, then <strong>click Refresh (↻)</strong> to see generated steps.
+            </p>
+        </div>
+        
+        <div style="border-top: 1px solid var(--border-subtle); padding-top: 1.5rem;">
+            <h3 class="action-card-title">Generate via AI (Autonomous Agent)</h3>
+            <form method="POST" action="/ui/scripts/{{ script.id }}/upload" enctype="multipart/form-data" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+                <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                    <label>Upload Script File (CSV, Excel, TXT)</label>
+                    <input type="file" name="file" class="form-control" required accept=".csv,.xlsx,.xls,.txt,.md,.json" style="padding: 0.4rem; font-size: 0.85rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0; min-width: 150px;">
+                    <label>Target Environment</label>
+                    <select name="environment_id" required class="form-control" style="padding: 0.4rem; font-size: 0.85rem;">
+                        {% for env in environments %}
+                        <option value="{{ env.id }}">{{ env.name }} (Workspace {{ env.workspace_id }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-secondary" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.3);">✨ Run Agent</button>
+            </form>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.75rem; margin-bottom: 0;">
+                The AI Agent will launch a browser, navigate to the Environment, interpret your file, and autonomously record the steps.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div style="margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-subtle); display: flex; gap: 1rem;">
+    <button class="tab-btn active" onclick="switchTab('steps', this)">Structured Steps</button>
+    <button class="tab-btn" onclick="switchTab('code', this)">Raw Python Code</button>
+</div>
+
+<div id="tab-steps" class="tab-content active">
+    <div class="table-container" style="margin-top: 0;">
+        <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Steps Configuration</span>
+            <button class="btn btn-secondary" style="padding: 0.3rem 0.75rem; font-size: 0.8rem;" onclick="document.getElementById('addStepForm').style.display='block'">+ Add Step</button>
+        </div>
+        <div id="addStepForm" style="display: none; padding: 1.5rem; background: var(--bg-panel-hover); border-bottom: 1px solid var(--border-subtle);">
+            <form method="POST" action="/ui/scripts/{{ script.id }}/steps">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Step #</label>
+                        <input type="number" name="step_number" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Action</label>
+                        <input type="text" name="action" required placeholder="e.g. click, fill, navigate">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Business Description</label>
+                        <input type="text" name="business_description" placeholder="e.g. Click login button">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Target Name</label>
+                        <input type="text" name="target_name" placeholder="e.g. Search Input">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Locator Strategy</label>
+                        <select name="locator_strategy">
+                            <option value="">None</option>
+                            <option value="css">CSS</option>
+                            <option value="xpath">XPath</option>
+                            <option value="role">Role</option>
+                            <option value="text">Text</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Locator Value</label>
+                        <input type="text" name="locator_value" placeholder="e.g. button[type=submit]">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Variable Name</label>
+                        <input type="text" name="variable_name" placeholder="e.g. SearchTerm">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Fallback Value</label>
+                        <input type="text" name="current_value" placeholder="Value if not parameterized">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Expected Result</label>
+                        <input type="text" name="expected_result" placeholder="Optional assertion">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Component Group</label>
+                        <input type="text" name="component_group" placeholder="e.g. Login Module">
+                    </div>
+                </div>
+                <button type="submit" class="btn" style="padding: 0.4rem 1rem;">Save Step</button>
+                <button type="button" class="btn btn-secondary" style="padding: 0.4rem 1rem;" onclick="document.getElementById('addStepForm').style.display='none'">Cancel</button>
+            </form>
+        </div>
+        <div class="split-pane-layout" style="display: flex; gap: 1.5rem; height: calc(100vh - 350px); min-height: 600px; margin-top: 1.5rem;">
+            <!-- Left Pane: Timeline -->
+            <div class="timeline-sidebar" style="width: 320px; background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <div style="padding: 1rem; border-bottom: 1px solid var(--border-subtle); background: var(--bg-panel-hover); font-weight: 600; color: var(--text-primary); display: flex; justify-content: space-between; align-items: center; font-size: 0.95rem; letter-spacing: 0.02em;">
+                    <span>Business Process</span>
+                </div>
+                <div style="flex: 1; overflow-y: auto; padding: 0.5rem 0;">
+                    {% if script.steps|length == 0 %}
+                    <div style="padding: 2rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+                        No steps recorded yet.
+                    </div>
+                    {% endif %}
+                    {% for step in script.steps %}
+                    <div class="timeline-item" onclick="selectStep('{{ step.id }}')" id="timeline-item-{{ step.id }}" style="padding: 0.85rem 1rem; cursor: pointer; border-left: 3px solid transparent; border-bottom: 1px solid rgba(255,255,255,0.03); transition: all 0.2s; display: flex; gap: 0.75rem; align-items: flex-start;">
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); border: 1px solid var(--border-subtle); box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);">#{{ step.step_number }}</div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.25rem;">{{ step.business_description or step.action|title }}</div>
+                            <div style="font-size: 0.75rem; color: #a1a1aa; display: flex; align-items: center; gap: 0.3rem;">
+                                {% if step.action|lower == 'navigate' %}<svg style="width:12px;height:12px;color:#3b82f6;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
+                                {% elif step.action|lower == 'click' %}<svg style="width:12px;height:12px;color:#f97316;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                                {% elif step.action|lower == 'input' or step.action|lower == 'fill' %}<svg style="width:12px;height:12px;color:#10b981;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                {% else %}<svg style="width:12px;height:12px;color:#a1a1aa;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>{% endif %}
+                                {{ step.action|title }}
+                            </div>
+                        </div>
+                        {% if step.locator_strategy == 'xpath' or step.locator_strategy == 'css' %}
+                        <div title="AI Self-Healing Enabled" style="color: #3b82f6; opacity: 0.8; margin-top: 0.1rem;"><svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg></div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Right Pane: Detail View -->
+            <div class="detail-panel" style="flex: 1; background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <div id="no-step-selected" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); background: rgba(0,0,0,0.1);">
+                    <svg style="width: 56px; height: 56px; margin-bottom: 1.5rem; opacity: 0.3; color: var(--accent-orange);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path></svg>
+                    <h3 style="margin: 0 0 0.5rem 0; color: var(--text-primary); font-weight: 500;">Metadata Snapshot</h3>
+                    <p style="margin: 0; font-size: 0.9rem;">Select a step from the timeline to view Impact Analysis and Data Mapping.</p>
+                </div>
+
+                {% for step in script.steps %}
+                <div class="step-detail-view" id="step-detail-{{ step.id }}" style="display: none; flex: 1; overflow-y: auto; flex-direction: column;">
+                    <div style="padding: 1.5rem 2rem; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: flex-start; background: var(--bg-panel-hover);">
+                        <div>
+                            <h2 style="margin: 0; font-size: 1.3rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.75rem; font-weight: 600;">
+                                <span style="background: rgba(249, 115, 22, 0.15); color: var(--accent-orange); border: 1px solid rgba(249, 115, 22, 0.3); border-radius: 4px; padding: 0.1rem 0.5rem; font-size: 0.85rem; font-weight: 700;">Step {{ step.step_number }}</span>
+                                {{ step.business_description or step.action|title }}
+                            </h2>
+                            <p style="margin: 0.75rem 0 0 0; color: var(--text-muted); font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="display: flex; align-items: center; gap: 0.2rem;"><svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg> Oracle Fusion Cloud</span>
+                                <span style="color: var(--border-subtle);">|</span>
+                                <span style="display: flex; align-items: center; gap: 0.2rem;"><svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> Action: <strong style="color: #e5e7eb;">{{ step.action|title }}</strong></span>
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary" style="font-size: 0.8rem; border-color: #3b82f6; color: #3b82f6; background: rgba(59, 130, 246, 0.1);" title="AI automatically updates locators on failure">Self Heal AI Active</button>
+                            <button class="btn btn-secondary" onclick="document.getElementById('step-edit-form-{{ step.id }}').style.display='block'; document.getElementById('step-view-content-{{ step.id }}').style.display='none';">Edit Step</button>
+                            <form method="POST" action="/ui/scripts/{{ script.id }}/steps/{{ step.id }}/delete" style="margin:0;" onsubmit="return confirm('Delete this step?');">
+                                <button type="submit" class="btn btn-secondary" style="font-size: 0.8rem; color: var(--error-text); background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3);">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- View Mode -->
+                    <div class="step-view-content" id="step-view-content-{{ step.id }}" style="padding: 2rem; flex: 1; background: rgba(0,0,0,0.1);">
+                        <h3 style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 0; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.75rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg style="width:16px;height:16px;color:var(--accent-orange);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                            Form Impact Analysis
+                        </h3>
+                        
+                        <div style="display: flex; gap: 1.5rem;">
+                            <!-- Expected Target -->
+                            <div style="flex: 1; background: var(--bg-panel); border-radius: 8px; border: 1px solid var(--border-subtle); overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="padding: 0.75rem 1.25rem; background: var(--bg-panel-hover); font-weight: 600; font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 1px solid var(--border-subtle); color: var(--text-primary); display: flex; justify-content: space-between; align-items: center;">
+                                    Expected Target
+                                    <span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.65rem;">Active</span>
+                                </div>
+                                <div style="padding: 1.25rem;">
+                                    <div style="margin-bottom: 1.25rem;">
+                                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Element Name</label>
+                                        <div style="font-size: 0.95rem; color: #e5e7eb; margin-top: 0.3rem; font-weight: 500;">{{ step.target_name or 'Auto-Detected Element' }}</div>
+                                    </div>
+                                    <div>
+                                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Technical Locator</label>
+                                        <div style="font-size: 0.85rem; font-family: ui-monospace, SFMono-Regular, monospace; color: #93c5fd; margin-top: 0.3rem; word-break: break-all; background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+                                            {% if step.locator_strategy %}<span style="color:#a1a1aa;">{{ step.locator_strategy }}:</span> {% endif %}{{ step.locator_value }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Actual Data Mapping -->
+                            <div style="flex: 1; background: var(--bg-panel); border-radius: 8px; border: 1px solid var(--border-subtle); overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="padding: 0.75rem 1.25rem; background: var(--bg-panel-hover); font-weight: 600; font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 1px solid var(--border-subtle); color: var(--text-primary); display: flex; justify-content: space-between; align-items: center;">
+                                    Data Mapping
+                                    {% if step.variable_name %}
+                                    <span style="background: rgba(249, 115, 22, 0.15); color: #fdba74; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.65rem;">Mapped</span>
+                                    {% else %}
+                                    <span style="background: rgba(161, 161, 170, 0.15); color: #a1a1aa; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.65rem;">Static</span>
+                                    {% endif %}
+                                </div>
+                                <div style="padding: 1.25rem;">
+                                    <div style="margin-bottom: 1.25rem;">
+                                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Bound Parameter</label>
+                                        <div style="font-size: 0.95rem; margin-top: 0.3rem;">
+                                            {% if step.variable_name %}
+                                            <span style="background: rgba(249, 115, 22, 0.1); color: #fdba74; padding: 0.3rem 0.75rem; border-radius: 4px; border: 1px solid rgba(249, 115, 22, 0.3); font-family: ui-monospace, SFMono-Regular, monospace; font-weight: 500; display: inline-block;">{{"{"}}{{ step.variable_name }}{{"}"}}</span>
+                                            {% else %}
+                                            <span style="color: var(--text-muted); font-style: italic;">No parameter mapped</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Fallback Value</label>
+                                        <div style="font-size: 0.9rem; color: #e5e7eb; margin-top: 0.3rem; background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); min-height: 2.5rem; word-break: break-all;">
+                                            {{ step.current_value or '' }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if step.expected_result %}
+                        <div style="margin-top: 1.5rem; background: var(--bg-panel); border-radius: 8px; border: 1px solid var(--border-subtle); padding: 1.25rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 0.3rem;">
+                                <svg style="width:12px;height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                Expected Assertion Result
+                            </label>
+                            <div style="font-size: 0.95rem; color: #d1d5db; margin-top: 0.4rem; font-weight: 500;">{{ step.expected_result }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Edit Mode (Hidden) -->
+                    <div class="step-edit-form" id="step-edit-form-{{ step.id }}" style="display: none; padding: 2rem; background: var(--bg-panel); flex: 1; overflow-y: auto;">
+                        <h3 style="margin-top: 0; margin-bottom: 1.5rem; color: var(--text-primary); font-weight: 600;">Edit Step Configuration</h3>
+                        <form method="POST" action="/ui/scripts/{{ script.id }}/steps/{{ step.id }}/edit">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Step #</label>
+                                    <input type="number" name="step_number" value="{{ step.step_number }}" required style="background: rgba(0,0,0,0.2);">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Action</label>
+                                    <input type="text" name="action" value="{{ step.action }}" required style="background: rgba(0,0,0,0.2);">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Business Description</label>
+                                    <input type="text" name="business_description" value="{{ step.business_description or '' }}" style="background: rgba(0,0,0,0.2);">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Target Name</label>
+                                    <input type="text" name="target_name" value="{{ step.target_name or '' }}" style="background: rgba(0,0,0,0.2);">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Locator Strategy</label>
+                                    <select name="locator_strategy" style="background: rgba(0,0,0,0.2);">
+                                        <option value="" {% if not step.locator_strategy %}selected{% endif %}>None</option>
+                                        <option value="css" {% if step.locator_strategy == 'css' %}selected{% endif %}>CSS</option>
+                                        <option value="xpath" {% if step.locator_strategy == 'xpath' %}selected{% endif %}>XPath</option>
+                                        <option value="role" {% if step.locator_strategy == 'role' %}selected{% endif %}>Role</option>
+                                        <option value="text" {% if step.locator_strategy == 'text' %}selected{% endif %}>Text</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Locator Value</label>
+                                    <input type="text" name="locator_value" value="{{ step.locator_value or '' }}" style="background: rgba(0,0,0,0.2);">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Variable Name</label>
+                                    <input type="text" name="variable_name" value="{{ step.variable_name or '' }}" style="background: rgba(0,0,0,0.2);">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Fallback Value</label>
+                                    <input type="text" name="current_value" value="{{ step.current_value or '' }}" style="background: rgba(0,0,0,0.2);">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Expected Result</label>
+                                    <input type="text" name="expected_result" value="{{ step.expected_result or '' }}" style="background: rgba(0,0,0,0.2);">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Component Group</label>
+                                    <input type="text" name="component_group" value="{{ step.component_group or '' }}" style="background: rgba(0,0,0,0.2);">
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 1rem; border-top: 1px solid var(--border-subtle); padding-top: 1.5rem;">
+                                <button type="submit" class="btn" style="padding: 0.6rem 2rem;">Save Changes</button>
+                                <button type="button" class="btn btn-secondary" style="padding: 0.6rem 2rem;" onclick="document.getElementById('step-edit-form-{{ step.id }}').style.display='none'; document.getElementById('step-view-content-{{ step.id }}').style.display='block';">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <style>
+        .timeline-item:hover { background: rgba(255,255,255,0.03); }
+        .timeline-item.selected { 
+            background: rgba(249, 115, 22, 0.08); 
+            border-left-color: var(--accent-orange) !important; 
+        }
+        .timeline-item.selected .step-number {
+            background: var(--accent-orange) !important;
+            color: white !important;
+            border-color: var(--accent-orange) !important;
+            box-shadow: 0 0 10px rgba(249, 115, 22, 0.5) !important;
+        }
+        </style>
+        <script>
+        function selectStep(stepId) {
+            document.getElementById('no-step-selected').style.display = 'none';
+            document.querySelectorAll('.step-detail-view').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.step-edit-form').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.step-view-content').forEach(el => el.style.display = 'block');
+            document.querySelectorAll('.timeline-item').forEach(el => el.classList.remove('selected'));
+            document.getElementById('step-detail-' + stepId).style.display = 'flex';
+            document.getElementById('timeline-item-' + stepId).classList.add('selected');
+        }
+        </script>
+    </div>
+</div>
+
+<div id="tab-code" class="tab-content">
+    <div class="card" style="margin-top: 0;">
+        {% if script.raw_code %}
+        <div style="padding: 1.5rem; background: #0d1117; border-radius: 6px; overflow-x: auto;">
+            <pre style="margin: 0; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.9rem; color: #e6edf3;">{{ script.raw_code }}</pre>
+        </div>
+        {% else %}
+        <p style="color: var(--text-muted); text-align: center; margin: 2rem 0;">No raw python code available. Please use 'Start Recording' to generate code.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function switchTab(tabId, btn) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tabId).classList.add('active');
+    btn.classList.add('active');
+}
+
+let pollingInterval;
+let currentRunId = null;
+
+document.getElementById('stopBtn').addEventListener('click', async () => {
+    if (!currentRunId) return;
+    try {
+        await fetch(`/api/executions/${currentRunId}/cancel`, { method: 'POST' });
+        document.getElementById('stopBtn').innerText = 'STOPPING...';
+        document.getElementById('stopBtn').disabled = true;
+    } catch (e) {
+        console.error(e);
+    }
+});
+
+async function executeScript(e) {
+    e.preventDefault();
+    const envId = document.getElementById('envSelect').value;
+    const profileId = document.getElementById('profileSelect').value;
+    const runMode = document.getElementById('runModeSelect').value;
+    const scriptId = parseInt("{{ script.id }}");
+    const btn = document.getElementById('runBtn');
+    const resultDiv = document.getElementById('runResult');
+    const liveConsole = document.getElementById('liveConsole');
+    const liveSteps = document.getElementById('liveSteps');
+    const liveStatusBadge = document.getElementById('liveStatusBadge');
+    const liveReportLink = document.getElementById('liveReportLink');
+    
+    // Gather advanced options
+    const headless = document.getElementById('execHeadless').checked;
+    const recordVideo = document.getElementById('execVideo').checked;
+    const collectTrace = document.getElementById('execTrace').checked;
+    const screenshots = document.getElementById('execScreenshots').value;
+    
+    liveConsole.style.display = "block";
+    liveSteps.innerHTML = "<div>Initializing execution...</div>";
+    liveStatusBadge.innerText = "PENDING";
+    liveStatusBadge.style.backgroundColor = "#525252";
+    liveReportLink.style.display = "none";
+    
+    const stopBtn = document.getElementById('stopBtn');
+    stopBtn.style.display = "inline-block";
+    stopBtn.disabled = false;
+    stopBtn.innerText = "STOP EXECUTION";
+    
+    try {
+        const payload = {
+            script_id: scriptId,
+            environment_id: envId ? parseInt(envId) : null,
+            data_profile_id: profileId ? parseInt(profileId) : null,
+            headless: headless,
+            record_video: recordVideo,
+            collect_trace: collectTrace,
+            screenshots: screenshots,
+            run_mode: runMode
+        };
+
+        const response = await fetch(`/api/executions/run`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        if(response.ok) {
+            btn.innerText = "Running ⏳";
+            const runId = data.run_id;
+            
+            // Poll for status
+            const pollInterval = setInterval(async () => {
+                try {
+                    const statusRes = await fetch(`/api/executions/${runId}/status`);
+                    if (statusRes.ok) {
+                        const statusData = await statusRes.json();
+                        
+                        // Update overall status
+                        liveStatusBadge.innerText = statusData.status.toUpperCase();
+                        if (statusData.status === "Running") {
+                            liveStatusBadge.style.backgroundColor = "#ca8a04"; // yellow
+                        } else if (statusData.status === "Passed") {
+                            liveStatusBadge.style.backgroundColor = "#16a34a"; // green
+                        } else if (statusData.status === "Failed") {
+                            liveStatusBadge.style.backgroundColor = "#dc2626"; // red
+                        }
+                        
+                        // Update steps list
+                        let stepsHtml = "";
+                        statusData.steps.forEach(s => {
+                            let color = "#9ca3af"; // pending/gray
+                            let icon = "⏳";
+                            if (s.status === "Passed") { color = "#4ade80"; icon = "✅"; }
+                            if (s.status === "Failed") { color = "#f87171"; icon = "❌"; }
+                            if (s.status === "Running") { color = "#fde047"; icon = "▶️"; }
+                            
+                            stepsHtml += `<div style="color: ${color}">[Step ${s.step_number}] ${icon} ${s.action} ${s.target ? s.target.substring(0,40) : ''}</div>`;
+                            if (s.error) {
+                                stepsHtml += `<div style="color: #fca5a5; padding-left: 1rem;">↳ ${s.error}</div>`;
+                            }
+                        });
+                        
+                        if (statusData.steps.length === 0) {
+                            stepsHtml = "<div>Waiting for browser to launch...</div>";
+                        }
+                        
+                        liveSteps.innerHTML = stepsHtml;
+                        liveSteps.scrollTop = liveSteps.scrollHeight; // auto-scroll to bottom
+                        
+                        // If finished, stop polling
+                        if (statusData.status === "Passed" || statusData.status === "Failed" || statusData.status === "Cancelled") {
+                            clearInterval(pollingInterval);
+                            btn.disabled = false;
+                            btn.innerText = "Run Execution";
+                            document.getElementById('stopBtn').style.display = "none";
+                            currentRunId = null;
+                            if (statusData.status !== "Cancelled") {
+                                liveReportLink.innerHTML = `
+                                    <div style="display: flex; gap: 1rem;">
+                                        <a href="/api/reports/${runId}/report" target="_blank" class="btn" style="background: #16a34a;">View Detailed Report</a>
+                                        <a href="/api/reports/${runId}/word" class="btn" style="background: #2563eb; color: white;">Download Documentation (.docx)</a>
+                                    </div>
+                                `;
+                                liveReportLink.style.display = "block";
+                            }
+                        }
+                    }
+                } catch(err) {
+                    console.error("Polling error", err);
+                }
+            }, 1000); // poll every 1s
+            
+        } else {
+            resultDiv.innerHTML = `<span style="color: var(--error-text);">Error: ${data.detail || 'Failed to start'}</span>`;
+            btn.disabled = false;
+            btn.innerText = "Run Execution";
+            liveConsole.style.display = "none";
+        }
+    } catch(err) {
+        resultDiv.innerHTML = `<span style="color: var(--error-text);">Error: ${err.message}</span>`;
+        btn.disabled = false;
+        btn.innerText = "Run Execution";
+        liveConsole.style.display = "none";
+    }
+}
+</script>
+{% endblock %}

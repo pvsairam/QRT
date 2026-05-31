@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Test Cases | FusionTest{% endblock %}
+{% block content %}
+<div style="margin-bottom: 2.5rem; display: flex; justify-content: space-between; align-items: flex-end;">
+    <div>
+        <h1>Test Cases</h1>
+        <p class="page-desc">Library of automated test cases for Oracle Fusion modules.</p>
+    </div>
+    <button class="btn" onclick="document.getElementById('addForm').style.display='block'">+ New Test Case</button>
+</div>
+
+<div id="addForm" class="card" style="display: none; margin-bottom: 2rem;">
+    <form method="POST" action="/ui/scripts">
+        <div class="form-group">
+            <label>Test Case Name</label>
+            <input type="text" name="name" required>
+        </div>
+        <div class="form-group">
+            <label>Category (e.g., HCM > Workforce)</label>
+            <input type="text" name="category">
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <input type="text" name="description">
+        </div>
+        <button type="submit" class="btn">Create</button>
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('addForm').style.display='none'">Cancel</button>
+    </form>
+</div>
+
+<div class="table-container">
+    <div class="table-header">All Test Cases</div>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Steps</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for script in scripts %}
+            <tr id="script-view-{{ script.id }}">
+                <td>{{ script.id }}</td>
+                <td><strong><a href="/ui/scripts/{{ script.id }}">{{ script.name }}</a></strong></td>
+                <td>{{ script.category }}</td>
+                <td><span class="status-badge {{ script.status | lower }}">{{ script.status }}</span></td>
+                <td>{{ script.steps|length }}</td>
+                <td>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="document.getElementById('script-edit-{{ script.id }}').style.display='table-row'; document.getElementById('script-view-{{ script.id }}').style.display='none';">Edit</button>
+                        <form method="POST" action="/ui/scripts/{{ script.id }}/delete" onsubmit="return confirm('Delete this test case?');">
+                            <button type="submit" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; color: var(--error-text);">Delete</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            <tr id="script-edit-{{ script.id }}" style="display: none;">
+                <td>{{ script.id }}</td>
+                <td colspan="5">
+                    <form method="POST" action="/ui/scripts/{{ script.id }}/edit" style="display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="text" name="name" value="{{ script.name }}" required style="padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                        <input type="text" name="category" value="{{ script.category or '' }}" placeholder="Category" style="padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                        <input type="text" name="description" value="{{ script.description or '' }}" placeholder="Description" style="padding: 0.4rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: white; border-radius: 4px; flex-grow: 1;">
+                        <button type="submit" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Save</button>
+                        <button type="button" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="document.getElementById('script-edit-{{ script.id }}').style.display='none'; document.getElementById('script-view-{{ script.id }}').style.display='table-row';">Cancel</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted);">No test cases found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

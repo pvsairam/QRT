@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Execution Report - FusionTest Platform{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+    <a href="/ui/executions" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem; display: inline-flex; align-items: center; gap: 4px;">&larr; Back to History</a>
+    <h1 style="margin-bottom: 0.5rem;">Execution Report #{{ run.id }}</h1>
+    <p class="page-desc" style="max-width: 800px; margin-bottom: 1.5rem;">
+        <strong>Script:</strong> <a href="/ui/scripts/{{ run.script_id }}">{{ run.script.name }}</a><br>
+        <strong>Environment:</strong> {{ run.environment.name if run.environment else 'Unknown' }}<br>
+        <strong>Status:</strong> 
+        {% if run.status == 'Passed' %}
+        <span style="color: #1e8e3e; font-weight: bold;">Passed</span>
+        {% elif run.status == 'Failed' %}
+        <span style="color: #d93025; font-weight: bold;">Failed</span>
+        {% else %}
+        <span style="color: #b06000; font-weight: bold;">{{ run.status }}</span>
+        {% endif %}<br>
+        <strong>Date:</strong> {{ run.started_at.strftime('%Y-%m-%d %H:%M:%S') if run.started_at else '' }}
+    </p>
+</div>
+
+<div class="card" style="margin-top: 1rem;">
+    <h3>Step-by-Step Execution</h3>
+    
+    <table class="data-table" style="margin-top: 1rem;">
+        <thead>
+            <tr>
+                <th>Step</th>
+                <th>Action</th>
+                <th>Target</th>
+                <th>Status</th>
+                <th>Details</th>
+                <th>Screenshot</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for step_res in run.step_results|sort(attribute='step.step_number') %}
+            <tr>
+                <td>{{ step_res.step.step_number if step_res.step else '-' }}</td>
+                <td>{{ step_res.step.action|title if step_res.step else '-' }}</td>
+                <td>{{ step_res.step.target_name or step_res.step.locator_value if step_res.step else '-' }}</td>
+                <td>
+                    {% if step_res.status == 'Passed' %}
+                    <span class="badge" style="background: #e6f4ea; color: #1e8e3e; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Passed</span>
+                    {% elif step_res.status == 'Failed' %}
+                    <span class="badge" style="background: #fce8e6; color: #d93025; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Failed</span>
+                    {% else %}
+                    <span class="badge" style="background: #f1f3f4; color: #5f6368; padding: 2px 8px; border-radius: 12px; font-size: 12px;">{{ step_res.status }}</span>
+                    {% endif %}
+                </td>
+                <td style="max-width: 250px; overflow-wrap: break-word; color: #d93025; font-size: 0.85rem;">
+                    {{ step_res.error_message or '' }}
+                </td>
+                <td>
+                    {% if step_res.screenshot_path %}
+                    <a href="/{{ step_res.screenshot_path }}" target="_blank" style="color: #3b82f6; font-size: 0.85rem;">View Image</a>
+                    {% else %}
+                    - 
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not run.step_results %}
+            <tr>
+                <td colspan="6" style="text-align: center; color: #5f6368;">No step results recorded.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card" style="margin-top: 1rem; margin-bottom: 2rem;">
+    <h3>Execution Artifacts</h3>
+    <ul style="margin-top: 1rem; color: #3b82f6;">
+        {% if run.video_path %}
+        <li style="margin-bottom: 0.5rem;"><a href="/{{ run.video_path }}" target="_blank">Download Video Recording</a></li>
+        {% endif %}
+        {% if run.trace_path %}
+        <li style="margin-bottom: 0.5rem;"><a href="/{{ run.trace_path }}" target="_blank">Download Playwright Trace (.zip)</a></li>
+        {% endif %}
+        <li style="margin-bottom: 0.5rem;"><a href="/api/reports/{{ run.id }}/report" target="_blank">Download Full HTML Report</a></li>
+    </ul>
+</div>
+{% endblock %}

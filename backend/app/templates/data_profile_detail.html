@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Data Profile | FusionTest{% endblock %}
+{% block content %}
+<div style="margin-bottom: 2.5rem; display: flex; justify-content: space-between; align-items: flex-start;">
+    <div>
+        <a href="/ui/data-profiles" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; display: inline-flex; align-items: center; gap: 4px;">&larr; Back to Profiles</a>
+        <h1>{{ profile.name }}</h1>
+        <p class="page-desc">Workspace ID: {{ profile.workspace_id }}</p>
+    </div>
+    
+    <button class="btn" onclick="document.getElementById('addValueForm').style.display='block'">+ Add Value</button>
+</div>
+
+<div id="addValueForm" class="card" style="display: none; margin-bottom: 2rem;">
+    <form method="POST" action="/ui/data-profiles/{{ profile.id }}/values">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+                <label>Variable Name</label>
+                <input type="text" name="variable_name" required placeholder="e.g. SearchTerm">
+            </div>
+            <div class="form-group">
+                <label>Actual Value</label>
+                <input type="text" name="actual_value" required placeholder="e.g. Test Framework">
+            </div>
+        </div>
+        <button type="submit" class="btn">Save Value</button>
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('addValueForm').style.display='none'">Cancel</button>
+    </form>
+</div>
+
+<div class="table-container">
+    <div class="table-header">
+        <span>Configured Values</span>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Variable Name</th>
+                <th>Actual Value</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for val in profile.values %}
+            <tr id="val-row-{{ val.id }}">
+                <td><span class="monospace text-accent">{{ val.variable_name }}</span></td>
+                <td>{{ val.actual_value }}</td>
+                <td>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="document.getElementById('val-edit-{{ val.id }}').style.display='table-row'; document.getElementById('val-row-{{ val.id }}').style.display='none';">Edit</button>
+                        <form method="POST" action="/ui/data-profiles/{{ profile.id }}/values/{{ val.id }}/delete" onsubmit="return confirm('Delete this value?');">
+                            <button type="submit" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; color: var(--error-text);">Delete</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            <tr id="val-edit-{{ val.id }}" style="display: none; background: var(--bg-base);">
+                <td colspan="3">
+                    <form method="POST" action="/ui/data-profiles/{{ profile.id }}/values/{{ val.id }}/edit" style="display: flex; gap: 1rem; align-items: flex-end;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.75rem;">Variable Name</label>
+                            <input type="text" name="variable_name" value="{{ val.variable_name }}" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.75rem;">Actual Value</label>
+                            <input type="text" name="actual_value" value="{{ val.actual_value }}" required>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.25rem;">
+                            <button type="submit" class="btn" style="padding: 0.4rem 1rem;">Save</button>
+                            <button type="button" class="btn btn-secondary" style="padding: 0.4rem 1rem;" onclick="document.getElementById('val-edit-{{ val.id }}').style.display='none'; document.getElementById('val-row-{{ val.id }}').style.display='table-row';">Cancel</button>
+                        </div>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3" style="text-align: center; color: var(--text-muted);">No values configured.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - FusionTest Platform{% endblock %}
+
+{% block content %}
+<div class="header-action">
+    <h2>Platform Settings</h2>
+</div>
+
+<div class="card" style="margin-top: 1rem;">
+    <h3>LLM Providers</h3>
+    <p class="text-muted">Configure AI providers for step generation and intelligent cleaning.</p>
+    
+    <table class="data-table" style="margin-top: 1rem;">
+        <thead>
+            <tr>
+                <th>Provider Name</th>
+                <th>API Key</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for provider in providers %}
+            <tr>
+                <td>{{ provider.provider_name|title }}</td>
+                <td><code>{{ provider.api_key_masked }}</code></td>
+                <td>
+                    {% if provider.is_active %}
+                    <span class="badge" style="background: #e6f4ea; color: #1e8e3e; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Active</span>
+                    {% else %}
+                    <span class="badge" style="background: #f1f3f4; color: #5f6368; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div style="display: flex; gap: 0.5rem;">
+                        {% if not provider.is_active %}
+                        <form method="POST" action="/ui/settings/llm/{{ provider.id }}/activate" style="margin:0;">
+                            <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Activate</button>
+                        </form>
+                        {% endif %}
+                        <form method="POST" action="/ui/settings/llm/{{ provider.id }}/delete" style="margin:0;">
+                            <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; color: #d93025; border-color: #fad2cf; background: #fce8e6;">Delete</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not providers %}
+            <tr>
+                <td colspan="4" style="text-align: center; color: #5f6368;">No LLM providers configured.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+    
+    <div style="margin-top: 2rem;">
+        <h4>Add Provider</h4>
+        <form method="POST" action="/ui/settings/llm" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Provider</label>
+                <select name="provider_name" class="form-control" required style="width: 200px;">
+                    <option value="gemini">Google Gemini</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic Claude</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>API Key</label>
+                <input type="password" name="api_key_secret" class="form-control" required style="width: 300px;" placeholder="Enter secret key">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; height: 38px;">
+                    <input type="checkbox" name="is_active" value="true" checked>
+                    Set as Active
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary" style="height: 38px;">Add Provider</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}FusionTest Platform{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="logo">
+            <div class="logo-box"></div>
+            <a href="/ui/dashboard" style="color: inherit; text-decoration: none;">FusionTest</a>
+        </div>
+        <nav class="nav-links">
+            <a href="/ui/dashboard" class="{% if request.url.path == '/ui/dashboard' %}active{% endif %}">Dashboard</a>
+            <a href="/ui/workspaces" class="{% if '/ui/workspaces' in request.url.path %}active{% endif %}">Environments</a>
+            <a href="/ui/data-profiles" class="{% if '/ui/data-profiles' in request.url.path %}active{% endif %}">Data Sets</a>
+            <a href="/ui/scripts" class="{% if '/ui/scripts' in request.url.path %}active{% endif %}">Test Cases</a>
+            <a href="/ui/executions" class="{% if '/ui/executions' in request.url.path %}active{% endif %}">Executions</a>
+            <a href="/ui/settings" class="{% if '/ui/settings' in request.url.path %}active{% endif %}">Settings</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        {% block content %}
+        {% endblock %}
+    </main>
+</body>
+</html>
