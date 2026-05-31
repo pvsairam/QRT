@@ -1,67 +1,98 @@
-# QRT - The Magic Oracle Automation Tool
+# QRT: AI-Powered Oracle Automation
 
-Hello! Welcome to QRT. 
+Welcome to QRT. This project is an advanced, AI-driven web automation engine specifically designed to test and interact with Oracle Fusion applications. It translates natural language test cases into reliable, self-healing browser automation steps using Playwright.
 
-Think of this tool like a smart robot. Its job is to open a web browser, go to Oracle Cloud, log in for you, and click all the right buttons so you do not have to do the boring work yourself!
+## Project Overview
 
-You can easily move this robot to a brand new computer and run it there. Here is exactly how to do it, step by step.
+Testing enterprise applications like Oracle Fusion is notoriously difficult due to complex interfaces, hidden HTML elements, and dynamic loading. QRT solves this by combining the reasoning of AI with a robust execution engine. 
 
-## How to Set Up the Robot on a New Computer
+### Key Technical Features
+* **FastAPI Backend:** A lightweight and incredibly fast Python web server that provides both the API and the user interface.
+* **Intelligent Execution Engine:** Built on top of Microsoft Playwright, the engine dynamically parses the screen, handles Oracle's hidden CSS masks, and intelligently searches for buttons and links using a strict priority system.
+* **AI Parser:** Automatically converts unstructured natural language test steps (like "Click Search") into structured JSON locator strategies.
+* **SQLite Database:** A local, lightweight database managed by Alembic to store execution histories, test scripts, and data profiles.
 
-### Step 1: Install Python
-Your computer needs to understand the language the robot speaks. This language is called Python.
-1. Go to the official Python website (python.org) and download Python 3.12 or newer.
-2. When installing, you must check the box that says "Add Python to PATH" before clicking Install. This is very important!
+---
 
-### Step 2: Download This Code
-Copy all the files in this project to your new computer. You can download it from GitHub as a ZIP file or use git to clone it. Extract the folder somewhere easy to find, like your Desktop.
+## Complete Setup Instructions
 
-### Step 3: Open the Terminal
-We need to give the robot a few commands. Open the command prompt (or terminal) on your new computer and navigate to the folder where you saved the code. Make sure you are inside the `backend` folder.
+Follow these steps to deploy and set up the QRT environment on a new machine.
 
-### Step 4: Create a Safe Space for the Robot
-We want to keep the robot's tools separate from the rest of your computer. We do this by creating a virtual environment. Type this command and press Enter:
-`python -m venv venv`
+### 1. Prerequisites
+You will need to have the following installed on your machine:
+* **Python 3.12 or newer**: Ensure that Python is added to your system PATH during installation.
+* **Git**: To clone the repository.
 
-### Step 5: Turn on the Safe Space
-Now we have to activate the space we just made. 
-If you are on Windows, type:
-`venv\Scripts\activate`
+### 2. Clone the Repository
+Open your terminal or command prompt and download the project code:
+```bash
+git clone https://github.com/pvsairam/QRT.git
+cd QRT/backend
+```
 
-If you are on Mac or Linux, type:
-`source venv/bin/activate`
+### 3. Create a Virtual Environment
+It is highly recommended to isolate the project dependencies. Create a virtual environment inside the `backend` directory:
+```bash
+python -m venv venv
+```
 
-### Step 6: Install the Robot's Tools
-The robot needs some special tools to work. We have a list of them in a file called `requirements.txt`. Tell the computer to install them by typing:
-`pip install -r requirements.txt`
+Activate the virtual environment:
+* On Windows: `venv\Scripts\activate`
+* On Mac or Linux: `source venv/bin/activate`
 
-### Step 7: Install the Web Browser
-The robot uses a special version of web browsers (like Chrome or Edge) to do its clicking. Tell it to download these browsers by typing:
-`playwright install`
+### 4. Install Dependencies
+With your virtual environment activated, install all the required Python libraries (like FastAPI, SQLAlchemy, and Playwright):
+```bash
+pip install -r requirements.txt
+```
 
-### Step 8: Build the Robot's Brain
-The robot needs a database to remember what tests to run and what passwords to use. Tell it to build its brain by typing:
-`alembic upgrade head`
+### 5. Install Playwright Browsers
+The execution engine requires specific browser binaries to run the automation. Download them by running:
+```bash
+playwright install
+```
 
-## How to Turn on the Tool
+### 6. Initialize the Database
+The project uses Alembic to manage database schema migrations. To create your local SQLite database and build the tables, run:
+```bash
+alembic upgrade head
+```
 
-Once everything is installed, you can start the application! Make sure your virtual environment is still activated (from Step 5). 
+---
 
-Then, just type this command:
-`uvicorn app.main:app --reload`
+## How to Run the Application
 
-You will see some text scrolling by. Look for a line that says "Application startup complete". This means the robot is awake and ready!
+Once your setup is complete, you can start the local web server. Make sure your virtual environment is activated, then run:
 
-Now, open your normal web browser (like Google Chrome) and type `http://127.0.0.1:8000/ui/dashboard` into the address bar at the top. You will see the main dashboard of the tool!
+```bash
+uvicorn app.main:app --reload
+```
+
+When you see the message "Application startup complete" in your terminal, the server is running. You can now access the web interface by opening a browser and navigating to:
+`http://127.0.0.1:8000/ui/dashboard`
+
+---
 
 ## How to Test the Tool
 
-Testing the tool is super easy and fun!
+Testing the QRT automation engine is a straightforward process. The web interface is designed to help you configure and execute tests visually.
 
-1. **Go to the Dashboard**: Open your browser and go to `http://127.0.0.1:8000/ui/dashboard`.
-2. **Set up a Data Profile**: Click on "Data Profiles" in the menu. This is where you securely save your Oracle username and password. Create a new profile and fill in your details.
-3. **Go to Scripts**: Click on "Scripts" in the menu. This is where the magic test scripts live.
-4. **Run a Test**: Click on one of your test scripts. 
-5. **Watch the Magic**: Choose the data profile you made earlier, and then click the "Run Execution" button! 
+### Step 1: Create a Data Profile
+To run tests, the engine needs valid Oracle credentials. 
+1. Navigate to **Data Profiles** in the side menu.
+2. Click **Add Profile** to create a new profile.
+3. Securely enter your Oracle Cloud environment URL, username, and password. 
 
-The robot will immediately wake up, open a brand new browser window, and start typing and clicking all by itself. Keep your hands off the mouse and watch it do your work for you!
+### Step 2: Configure a Test Script
+Test scripts define the exact sequence of actions the engine will take.
+1. Navigate to **Scripts** in the side menu.
+2. You can either write a natural language script and ask the AI to parse it, or view an existing script like "Create Location".
+3. Verify that the structured steps (like Navigate, Click, and Fill) look correct.
+
+### Step 3: Run the Execution
+1. Open the specific Test Script you want to run.
+2. At the top of the page, select the Data Profile you created in Step 1.
+3. Ensure the Execution Mode is set to "Structured Steps".
+4. Click the **Run Execution** button.
+
+The backend engine will immediately launch a Playwright browser window. It will inject your credentials, bypass any security bookmark errors, and autonomously execute the sequence of clicks and text inputs. You can watch the engine handle dynamic loads and accordion panels in real time as it completes the test.
