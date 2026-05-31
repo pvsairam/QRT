@@ -344,6 +344,23 @@ def add_script_step(
     component_group: str = Form(""),
     db: Session = Depends(get_db)
 ):
+    # Auto-adjust: If step_number exists, bump it and all subsequent steps down by 1
+    existing_step = db.query(models.TestStep).filter(
+        models.TestStep.script_id == script_id, 
+        models.TestStep.step_number == step_number
+    ).first()
+    
+    if existing_step:
+        # Get all steps >= this number, ordered descending to avoid unique constraint violations if any
+        subsequent_steps = db.query(models.TestStep).filter(
+            models.TestStep.script_id == script_id,
+            models.TestStep.step_number >= step_number
+        ).order_by(models.TestStep.step_number.desc()).all()
+        
+        for s in subsequent_steps:
+            s.step_number += 1
+        db.commit()
+
     new_step = models.TestStep(
         script_id=script_id,
         step_number=step_number,
@@ -387,6 +404,22 @@ def edit_script_step(
 ):
     step = db.query(models.TestStep).filter(models.TestStep.id == step_id).first()
     if step:
+        if step.step_number != step_number:
+            # Auto-adjust if editing to an existing step number
+            existing_step = db.query(models.TestStep).filter(
+                models.TestStep.script_id == script_id,
+                models.TestStep.step_number == step_number
+            ).first()
+            if existing_step:
+                subsequent_steps = db.query(models.TestStep).filter(
+                    models.TestStep.script_id == script_id,
+                    models.TestStep.step_number >= step_number,
+                    models.TestStep.id != step.id
+                ).order_by(models.TestStep.step_number.desc()).all()
+                for s in subsequent_steps:
+                    s.step_number += 1
+                db.commit()
+
         step.step_number = step_number
         step.action = action
         step.business_description = business_description

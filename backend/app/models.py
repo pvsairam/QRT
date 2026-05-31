@@ -48,7 +48,7 @@ class TestScript(Base):
     version = Column(Integer, default=1)
     status = Column(String, default="Draft")
     raw_code = Column(Text, nullable=True)
-    steps = relationship("TestStep", back_populates="script", cascade="all, delete-orphan")
+    steps = relationship("TestStep", back_populates="script", cascade="all, delete-orphan", order_by="TestStep.step_number")
     variables = relationship("TestVariable", back_populates="script", cascade="all, delete-orphan")
 
 class TestStep(Base):

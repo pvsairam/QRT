@@ -1,6 +1,6 @@
 import os
 import time
-from playwright.sync_api import sync_playwright, Page, Error as PlaywrightError
+from playwright.sync_api import sync_playwright, Page, expect, Error as PlaywrightError
 from typing import Dict, Any, List
 from ..models import TestScript, TestStep, DataProfileValue, ExecutionRun, ExecutionStepResult
 from sqlalchemy.orm import Session
@@ -169,8 +169,49 @@ class PlaywrightExecutor:
         else:
             code = code.replace("headless=True", "headless=False")
             
+        # Add base_url to variables if not present so it can be substituted
+        # Ensure it has a trailing slash to prevent concatenation errors like .comfscmUI
+        safe_base_url = base_url if base_url.endswith('/') else f"{base_url}/"
+        if "base_url" not in variables:
+            variables["base_url"] = safe_base_url
+            
+        # Substitute all {variables} in the raw code
+        code = self.substitute_variables(code, variables)
+        
+        # Fallback for the first goto if it wasn't parameterized
         import re
         code = re.sub(r'page\.goto\(["\'].+?["\']\)', f'page.goto("{base_url}")', code, count=1)
+        
+        # --- QRT FOOLPROOF HARDENING ---
+        # Intercept the raw playwright code and inject robust auto-waits and SSO protection
+        lines = code.split('\n')
+        hardened_lines = []
+        goto_count = 0
+        for line in lines:
+            stripped = line.strip()
+            
+            # 1. Global Timeout Injection
+            if "page = context.new_page()" in line:
+                hardened_lines.append(line)
+                hardened_lines.append("    page.set_default_timeout(30000) # QRT Injected: Global timeout")
+                continue
+                
+            # 2. SSO Interruption Protection (Strip secondary gotos)
+            if "page.goto(" in line:
+                goto_count += 1
+                if goto_count > 1:
+                    hardened_lines.append(f"    # QRT Injected: Commented out secondary goto to protect SSO -> {stripped}")
+                    continue
+            
+            # Keep the line
+            hardened_lines.append(line)
+            
+            # 3. Auto-Wait on Clicks
+            if ".click(" in line and "page." in line:
+                hardened_lines.append("    page.wait_for_timeout(1500) # QRT Injected: Pacing after click")
+
+        code = "\n".join(hardened_lines)
+        # --- END FOOLPROOF HARDENING ---
             
         # Optional: Add tracing to raw code (too complex for simple script inject, we just run it as is)
             
@@ -248,7 +289,11 @@ class PlaywrightExecutor:
         if "base_url" not in variables:
             variables["base_url"] = base_url
             
-        target_val = self.substitute_variables(step.locator_value or "", variables)
+        target_val = step.locator_value or ""
+        if not target_val and step.target_name:
+            target_val = step.target_name
+        target_val = self.substitute_variables(target_val, variables)
+        
         input_val = self.substitute_variables(step.current_value or "", variables)
         
         # Override with data profile value if variable is specified
@@ -330,7 +375,18 @@ class PlaywrightExecutor:
             elif is_role:
                 locators_to_try = [eval(f"page.get_by_role({target_val})")]
             else:
-                locators_to_try = [page.locator(target_val)]
+                if not step.locator_value and step.target_name:
+                    import re
+                    exact = re.compile(f"^\\s*{re.escape(step.target_name)}\\s*$", re.IGNORECASE)
+                    loose = re.compile(re.escape(step.target_name), re.IGNORECASE)
+                    locators_to_try = [
+                        page.get_by_text(exact),
+                        page.get_by_role("button", name=loose),
+                        page.get_by_role("link", name=loose),
+                        page.locator(f"*:not(input)[title='{step.target_name}' i]")
+                    ]
+                else:
+                    locators_to_try = [page.locator(target_val)]
 
         def capture_screenshot():
             if not screenshot_path: return
@@ -500,6 +556,51 @@ class PlaywrightExecutor:
                 
             capture_screenshot()
             
+        elif action == "asserttext":
+            assert_val = input_val if input_val else target_val
+            if not assert_val:
+                raise ValueError("No text provided to assert. Please provide it in target_name or locator_value.")
+                
+            if locators_to_try and step.locator_strategy and step.locator_strategy.lower() != "none":
+                # Check specific element
+                found = False
+                for locator in locators_to_try:
+                    try:
+                        expect(locator.first).to_contain_text(assert_val, timeout=15000, ignore_case=True)
+                        found = True
+                        break
+                    except:
+                        pass
+                if not found:
+                    raise PlaywrightError(f"Assertion failed: Could not find text '{assert_val}' in specified element")
+            else:
+                # Check whole page
+                expect(page.locator("body")).to_contain_text(assert_val, timeout=15000, ignore_case=True)
+                
+            capture_screenshot()
+            
+        elif action == "assertvisible":
+            if not locators_to_try or not step.locator_strategy or step.locator_strategy.lower() == "none":
+                raise ValueError("assertVisible requires a locator strategy and target")
+                
+            found = False
+            for locator in locators_to_try:
+                try:
+                    expect(locator.first).to_be_visible(timeout=15000)
+                    found = True
+                    break
+                except:
+                    pass
+            if not found:
+                raise PlaywrightError(f"Assertion failed: Element '{target_val}' is not visible on the screen")
+                
+            capture_screenshot()
+
         elif action == "waitfor":
-            time.sleep(2) # Naive wait for MVP
+            try:
+                # Read wait time from UI locator_value, default to 2 seconds if empty
+                wait_time = float(step.locator_value) if step.locator_value else 2.0
+            except ValueError:
+                wait_time = 2.0
+            time.sleep(wait_time)
             capture_screenshot()

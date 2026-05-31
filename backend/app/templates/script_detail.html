@@ -614,12 +614,24 @@ async function executeScript(e) {
                             document.getElementById('stopBtn').style.display = "none";
                             currentRunId = null;
                             if (statusData.status !== "Cancelled") {
-                                liveReportLink.innerHTML = `
-                                    <div style="display: flex; gap: 1rem;">
+                                let buttonsHtml = `
+                                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
                                         <a href="/api/reports/${runId}/report" target="_blank" class="btn" style="background: #16a34a;">View Detailed Report</a>
                                         <a href="/api/reports/${runId}/word" class="btn" style="background: #2563eb; color: white;">Download Documentation (.docx)</a>
-                                    </div>
                                 `;
+                                if (statusData.trace_path) {
+                                    // The trace path is usually like "data/traces/run_1.zip", so we map it to our "/data" mount
+                                    buttonsHtml += `
+                                        <a href="/${statusData.trace_path}" download class="btn btn-secondary">
+                                            🔍 Download Playwright Trace
+                                        </a>
+                                        <div style="width: 100%; color: #9ca3af; font-size: 0.85rem; margin-top: 0.5rem;">
+                                            To view the trace, open <a href="https://trace.playwright.dev" target="_blank" style="color: #60a5fa;">trace.playwright.dev</a> and drop the downloaded ZIP file into it!
+                                        </div>
+                                    `;
+                                }
+                                buttonsHtml += `</div>`;
+                                liveReportLink.innerHTML = buttonsHtml;
                                 liveReportLink.style.display = "block";
                             }
                         }

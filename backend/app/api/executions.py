@@ -146,5 +146,6 @@ def get_execution_status(run_id: int, db: Session = Depends(get_db)):
     return {
         "run_id": run.id,
         "status": run.status,
+        "trace_path": run.trace_path,
         "steps": steps
     }
