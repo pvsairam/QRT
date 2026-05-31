@@ -55,13 +55,10 @@ class PlaywrightExecutor:
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=headless)
                 
-                context_args = {
-                    "viewport": {"width": 1920, "height": 1080}
-                }
+                context_args = {}
                 if record_video:
                     os.makedirs("data/videos", exist_ok=True)
                     context_args["record_video_dir"] = "data/videos/"
-                    context_args["record_video_size"] = {"width": 1920, "height": 1080}
                     
                 context = browser.new_context(**context_args)
                 
