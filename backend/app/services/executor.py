@@ -315,6 +315,7 @@ class PlaywrightExecutor:
                 is_role = True
 
         element = None
+        locators_to_try = []
         if action in ["click", "fill"]:
             if step.locator_strategy == "text":
                 element = page.get_by_text(target_val)
@@ -393,7 +394,7 @@ class PlaywrightExecutor:
             
             target_el = element.first if element else None
             
-            if not target_el and 'locators_to_try' in locals():
+            if not target_el and locators_to_try:
                 for locator in locators_to_try:
                     for el in locator.all():
                         if el.get_attribute("aria-expanded") is None and el.is_visible():
